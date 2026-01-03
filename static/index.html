@@ -1,36 +1,129 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Sanfoundry Perfect Scraper</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SANFOUNDRY SCRAPER</title>
     <style>
-        body { background: #050505; color: #00ff41; font-family: monospace; display: flex; justify-content: center; padding-top: 50px; }
-        .terminal { border: 1px solid #00ff41; padding: 20px; width: 650px; background: #000; box-shadow: 0 0 20px #00ff41; }
-        .info { color: #888; font-size: 11px; border-left: 2px solid #444; padding-left: 10px; margin: 15px 0; }
-        input { width: 100%; background: #111; border: 1px solid #333; color: #fff; padding: 12px; margin-top: 10px; outline: none; }
-        button { width: 100%; background: #00ff41; color: #000; border: none; padding: 12px; margin-top: 10px; cursor: pointer; font-weight: bold; }
-        #log { font-size: 10px; margin-top: 20px; color: #008f11; }
+        :root { --glow: #00ff41; --bg: #050505; --panel: #0a0a0a; }
+        body { background: var(--bg); color: var(--glow); font-family: 'Courier New', monospace; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; overflow: hidden; }
+        
+        .terminal { border: 1px solid var(--glow); padding: 30px; width: 700px; background: var(--panel); box-shadow: 0 0 30px rgba(0, 255, 65, 0.2); position: relative; }
+        .terminal::before { content: "SYSTEM_READY"; position: absolute; top: -10px; left: 20px; background: var(--bg); padding: 0 10px; font-size: 10px; }
+        
+        h2 { font-size: 18px; letter-spacing: 2px; margin-bottom: 5px; text-shadow: 0 0 5px var(--glow); }
+        .version { font-size: 10px; color: #555; margin-bottom: 20px; }
+        
+        .info-box { border: 1px dashed #333; padding: 15px; margin-bottom: 20px; background: rgba(255,255,255,0.02); }
+        .info-line { font-size: 12px; color: #888; margin: 5px 0; display: flex; justify-content: space-between; }
+        
+        input { width: calc(100% - 24px); background: #000; border: 1px solid #004d13; color: #fff; padding: 12px; font-family: monospace; outline: none; transition: 0.3s; }
+        input:focus { border-color: var(--glow); box-shadow: 0 0 10px rgba(0, 255, 65, 0.1); }
+        
+        button { width: 100%; background: var(--glow); color: #000; border: none; padding: 15px; margin-top: 15px; cursor: pointer; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; transition: 0.2s; }
+        button:hover { background: #fff; box-shadow: 0 0 20px var(--glow); }
+        button:disabled { background: #1a331f; color: #004d13; cursor: not-allowed; }
+
+        #console-output { margin-top: 25px; height: 120px; overflow-y: auto; font-size: 11px; line-height: 1.6; border-top: 1px solid #222; padding-top: 10px; color: #008f11; }
+        .cursor { display: inline-block; width: 8px; height: 15px; background: var(--glow); animation: blink 1s infinite; vertical-align: middle; }
+        
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        
+        /* Loading Bar */
+        #progress-container { display: none; margin-top: 15px; }
+        .progress-bg { background: #111; height: 4px; width: 100%; border-radius: 2px; }
+        .progress-bar { background: var(--glow); height: 100%; width: 0%; transition: 0.5s; box-shadow: 0 0 10px var(--glow); }
     </style>
 </head>
 <body>
-    <div class="terminal">
-        <h2>> SANFOUNDRY_HIERARCHY_SCRAPER.EXE</h2>
-        <div class="info">
-            DETECTED MODES:<br>
-            - SUBTOPIC URL: Scrapes single page.<br>
-            - CHAPTER (#) URL: Merges subtopics in that chapter.<br>
-            - SUBJECT INDEX URL: Scrapes entire manual (Limited on Free Tier).
-        </div>
-        <input type="text" id="url" placeholder="PASTE ANY SANFOUNDRY URL...">
-        <button onclick="start()">INITIALIZE HIERARCHY SCRAPE</button>
-        <div id="log"></div>
+
+<div class="terminal">
+    <h2>> SANFOUNDRY_SCRAPER.SYS</h2>
+    <div class="version">V2.1.0-STABLE // ENCRYPTED_CONNECTION</div>
+
+    <div class="info-box">
+        <div class="info-line"><span>[MODE_01]</span> <span>SINGLE_TOPIC_SCRAPE</span></div>
+        <div class="info-line"><span>[MODE_02]</span> <span>CHAPTER_MERGE_RECURSIVE</span></div>
+        <div class="info-line"><span>[MODE_03]</span> <span>INDEX_GLOBAL_MANUAL (BETA)</span></div>
     </div>
-    <script>
-        function start() {
-            const url = document.getElementById('url').value;
-            const log = document.getElementById('log');
-            log.innerText = "[*] ANALYZING URL HIERARCHY...\n[*] SELECTING ENGINE MODE...\n[*] SCRAPING DATA (Wait 30-60s)...";
-            window.location.href = `/convert?url=${encodeURIComponent(url)}`;
+
+    <input type="text" id="urlInput" placeholder="ENTER TARGET SOURCE URL..." spellcheck="false">
+    
+    <button id="mainBtn" onclick="initializeScrape()">Execute Scrape Protocol</button>
+
+    <div id="progress-container">
+        <div class="progress-bg"><div class="progress-bar" id="bar"></div></div>
+    </div>
+
+    <div id="console-output">
+        <span id="log">SYSTEM READY. AWAITING INPUT...</span><span class="cursor"></span>
+    </div>
+</div>
+
+<script>
+    const logEl = document.getElementById('log');
+    const bar = document.getElementById('bar');
+    const btn = document.getElementById('mainBtn');
+    const progCont = document.getElementById('progress-container');
+
+    function updateLog(msg, progress) {
+        const time = new Date().toLocaleTimeString([], { hour12: false });
+        logEl.innerHTML += `<br>[${time}] ${msg}`;
+        bar.style.width = progress + '%';
+        const consoleObj = document.getElementById('console-output');
+        consoleObj.scrollTop = consoleObj.scrollHeight;
+    }
+
+    async function initializeScrape() {
+        const url = document.getElementById('urlInput').value;
+        if (!url) return;
+
+        // UI Reset
+        btn.disabled = true;
+        progCont.style.display = 'block';
+        logEl.innerHTML = "INITIALIZING PROTOCOL...";
+        
+        updateLog("VALIDATING HIERARCHY...", 10);
+        
+        try {
+            updateLog("ESTABLISHING HEADLESS_CHROMIUM CONNECTION...", 25);
+            updateLog("BYPASSING AD_LAYERS & LAZY_LOADS...", 40);
+            updateLog("FETCHING SOURCE HTML (MAY TAKE 60S)...", 60);
+
+            // Using fetch instead of direct location redirect to show logs
+            const response = await fetch(`/convert?url=${encodeURIComponent(url)}`);
+            
+            if (response.status === 200) {
+                updateLog("SCRAPE_SUCCESS! BUILDING PDF STRUCTURE...", 85);
+                updateLog("COMPILING IMAGES & MATH SYMBOLS...", 95);
+                
+                // Trigger the actual file download
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                
+                // Try to get filename from header
+                const disposition = response.headers.get('Content-Disposition');
+                const filename = disposition ? disposition.split('filename=')[1] : "Manual.pdf";
+                
+                a.download = filename.replace(/"/g, '');
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                
+                updateLog("DOWNLOAD INITIALIZED. PROCESS COMPLETE.", 100);
+            } else {
+                const errorData = await response.json();
+                updateLog(`ERROR: ${errorData.detail || 'SCRAPE_FAILED'}`, 0);
+            }
+        } catch (err) {
+            updateLog("CRITICAL_ERROR: SERVER_TIMED_OUT OR OFFLINE.", 0);
+        } finally {
+            btn.disabled = false;
         }
-    </script>
+    }
+</script>
+
 </body>
 </html>
