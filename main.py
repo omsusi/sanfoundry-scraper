@@ -142,3 +142,8 @@ def smart_convert(url: str = Query(...)):
         browser.close()
         
         return FileResponse(output_path, filename=filename.replace(" ", "_"))
+        page.set_content(f"<html><head>{style}</head><body>{final_html}</body></html>")
+        page.pdf(path=output_path, format="A4", print_background=True)
+        browser.close()
+        
+        return FileResponse(output_path, filename=filename.replace(" ", "_"))
